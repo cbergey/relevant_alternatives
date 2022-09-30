@@ -130,13 +130,13 @@ def get_n_most_likely(utterance, word_position, include_null = False, n = 5):
   completions = completions.assign(sentence = lambda dataframe: dataframe['word'].map(lambda word: replace_word(utterance, word_position, word)))
   return(zip(list(completions['sentence']),list(completions['prob'])))
 
-def add_utt(dict, parent_utt, child_utt, prob = 0):
+def add_utt(dict, parent_utt, child_utt, slot, prob = 0):
   if not parent_utt in dict:
     dict[parent_utt] = {}
-  dict[parent_utt][child_utt] = prob
+  dict[parent_utt][child_utt] = (slot, prob)
   return dict
 
-def normalize_dict(dict, sum):
+def normalize_dict(dict):
   for parent_key in dict.items():
     prob_sum = 0.0
     for child_key, prob in child_dict.items():
@@ -150,18 +150,25 @@ def rec_traverse(utt, depth, dict, iter = 1):
     for i in range(utt_len - 1):
       child_utts = get_n_most_likely(utt, i, n = n)
       for child_utt, prob in list(child_utts):
-        dict = add_utt(dict, utt, child_utt, prob)
+        dict = add_utt(dict, utt, child_utt, i, prob)
     return dict
   else:
     utt_len = len(utt.split())
     for i in range(utt_len - 1):
       child_utts = get_n_most_likely(utt, i, n = n)
       for child_utt, prob in list(child_utts):
-        dict = add_utt(dict, utt, child_utt, prob)
+        dict = add_utt(dict, utt, child_utt, i, prob)
         dict = rec_traverse(child_utt, depth, dict, iter + 1)
     return dict
 
-cat_net = rec_traverse("i love my cat .", 3, {})
+def normalize_net(net):
+  for parent_key, child_dict in net.items():
+    prob_sum = 0.0
+    for key, val in child_dict.items():
+      prob_sum = prob_sum + val
+    for key, val in child_dict.items():
+      net[parent_key][key] = val/prob_sum
+  return net
 
 def get_nodes_edges(net):
   nodes_dict = {}
@@ -184,9 +191,16 @@ def get_nodes_edges(net):
       edge_list.append([parent_node, child_node, val])
   return nodes_dict, edge_list
 
-nodes, edges = get_nodes_edges(cat_net)
+
+depth = 2
+sentence = "i love my cat ."
+
+net = rec_traverse(sentence, depth, {})
+
+nodes, edges = get_nodes_edges(net)
 
 nodes = pd.DataFrame(nodes.items())
 edges = pd.DataFrame(edges)
-nodes.to_csv('cat_nodes.csv', index=False, header=False)
-edges.to_csv('cat_edges.csv', index=False, header=False)
+name = sentence.replace(" ", "_") + str(depth) + "_net"
+nodes.to_csv(name + '_nodes.csv', index=False, header=False)
+edges.to_csv(name + '_edges.csv', index=False, header=False)
