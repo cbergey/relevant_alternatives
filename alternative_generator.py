@@ -80,6 +80,11 @@ def get_ents(utterance):
     positions.append(ent)
   return(positions)
 
+def get_slot_entropy(utterance, slot):
+  completions = bert_completions(get_masked(utterance, i), bertMaskedLM, tokenizer)
+  ent = entropy(completions['prob'])
+  return(ent)
+
 def get_probs(utterance):
   positions = []
   for i in range(len(utterance.split())):
